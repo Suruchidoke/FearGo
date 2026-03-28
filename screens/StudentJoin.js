@@ -29,8 +29,23 @@ export default function StudentJoin({ onJoin, onBack }) {
           <Ionicons name="pulse" size={26} color="#fff" />
           <Text style={styles.headerAppName}>ClassPulse</Text>
         </View>
+<<<<<<< HEAD
       </View>
 
+=======
+
+          <TouchableOpacity onPress={onBack} activeOpacity={0.8}>
+            <View style={styles.backPill}>
+            <Ionicons name="arrow-back" size={16} color="#fff" style={{ marginRight: 4 }} />
+            <Text style={styles.backPillText}>Back</Text>
+            </View>
+          </TouchableOpacity>
+
+      </View>
+
+      
+
+>>>>>>> 9662452 (Second commit of FearGo app)
       {/* ─── MAIN SCROLL BODY ─── */}
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
@@ -119,6 +134,11 @@ const styles = StyleSheet.create({
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center' },
   headerAppName: { fontSize: 20, fontWeight: 'bold', color: '#fff', marginLeft: 10, letterSpacing: 0.8 },
+<<<<<<< HEAD
+=======
+  backPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+  backPillText: { fontSize: 13, fontWeight: 'bold', color: '#fff' },
+>>>>>>> 9662452 (Second commit of FearGo app)
 
   // ─── Scroll ───
   scrollContainer: {

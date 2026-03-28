@@ -3,6 +3,7 @@ import { View, Text } from 'react-native';
 
 // Import Screens
 import RoleSelection from './screens/RoleSelection';
+import TeacherHome from './screens/TeacherHome';
 import LiveDashboard from './screens/LiveDashboard';
 import SessionSummary from './screens/SessionSummary';
 import StudentJoin from './screens/StudentJoin';
@@ -22,11 +23,16 @@ export default function App() {
   // ==========================
   if (currentView === 'roleSelection') {
     return (
+
       <RoleSelection 
         onSelectRole={(role) => {
           if (role === 'teacher') setCurrentView('liveDashboard');
           if (role === 'student') setCurrentView('studentJoin');
         }} 
+        onSelectRole={(role) => {
+          if (role === 'teacher') setCurrentView('teacherHome');
+          if (role === 'student') setCurrentView('studentJoin');
+        }}
       />
     );
   }
@@ -34,10 +40,25 @@ export default function App() {
   // ==========================
   // TEACHER FLOW
   // ==========================
+
   if (currentView === 'liveDashboard') {
     return (
       <LiveDashboard 
         onEndSession={() => setCurrentView('sessionSummary')} 
+  if (currentView === 'teacherHome') {
+    return (
+      <TeacherHome
+        onCreateSession={() => setCurrentView('liveDashboard')}
+        onViewSummary={() => setCurrentView('sessionSummary')}
+        onBack={() => setCurrentView('roleSelection')}
+      />
+    );
+  }
+  if (currentView === 'liveDashboard') {
+    return (
+      <LiveDashboard 
+        onEndSession={() => setCurrentView('sessionSummary')}
+        onBack={() => setCurrentView('roleSelection')}
       />
     );
   }
@@ -46,7 +67,10 @@ export default function App() {
     return (
       <SessionSummary 
         onRestart={() => setCurrentView('liveDashboard')} 
-      />
+
+        onRestart={() => setCurrentView('liveDashboard')}
+        onBack={() => setCurrentView('liveDashboard')}
+              />
     );
   }
 
