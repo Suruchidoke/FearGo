@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, SafeAreaView, TouchableOpacity, TextInput, ScrollView, Dimensions, Platform, StatusBar, KeyboardAvoidingView, Image } from 'react-native';
+import { StyleSheet, Text, View, SafeAreaView, TouchableOpacity, TextInput, ScrollView, Dimensions, Platform, StatusBar, KeyboardAvoidingView, Image, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import NeumorphicView from '../components/NeumorphicView';
 import { supabase } from '../utils/supabase';
@@ -12,9 +12,7 @@ export default function StudentAskDoubts({ sessionCode, onLeave, onPulseCheck, o
   const [pendingDoubts, setPendingDoubts] = useState([]);
   const [answeredDoubts, setAnsweredDoubts] = useState([]);
   
-  // --- NEW: Dynamic Quiz State ---
   const [activeQuiz, setActiveQuiz] = useState(null);
-  
   const [sessionId, setSessionId] = useState(null);
 
   useEffect(() => {
@@ -39,59 +37,70 @@ export default function StudentAskDoubts({ sessionCode, onLeave, onPulseCheck, o
   };
 
   const checkActiveQuiz = async (sId) => {
-    // Find if there is a quiz currently running for this session
     const { data } = await supabase.from('quizzes').select('*').eq('session_id', sId).eq('is_active', true).order('created_at', { ascending: false }).limit(1);
-    if (data && data.length > 0) {
-      setActiveQuiz(data[0]);
-    }
+    if (data && data.length > 0) setActiveQuiz(data[0]);
   };
 
   useEffect(() => {
     if (!sessionId) return;
 
-    // 1. Listen for Pulse Checks (Triggers the 3-button screen)
+    // 1. Listen for Pulse Checks
     const pulseSub = supabase.channel('public:pulses')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pulses', filter: `session_id=eq.${sessionId}` }, () => {
         onPulseCheck();
       }).subscribe();
 
-    // 2. Listen for Doubts being answered by the teacher
+    // 2. Listen for NEW Doubts and ANSWERED Doubts
     const doubtSub = supabase.channel('public:doubts_update')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'doubts', filter: `session_id=eq.${sessionId}` }, (payload) => {
+        // When a doubt hits the database, push it to the screen officially
+        setPendingDoubts(prev => [payload.new, ...prev]);
+      })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'doubts', filter: `session_id=eq.${sessionId}` }, (payload) => {
         if (payload.new.is_answered) {
-          setPendingDoubts(prev => prev.filter(d => d.id !== payload.new.id));
+          setPendingDoubts(prev => prev.filter(d => d.id !== payload.new.id)); // Now the IDs will match perfectly!
           setAnsweredDoubts(prev => [payload.new, ...prev]);
         }
       }).subscribe();
 
-    // 3. NEW: Listen for Quizzes starting or stopping
+    // 3. Listen for Quizzes
     const quizSub = supabase.channel('public:quizzes')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'quizzes', filter: `session_id=eq.${sessionId}` }, (payload) => {
         if (payload.new.is_active) setActiveQuiz(payload.new);
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'quizzes', filter: `session_id=eq.${sessionId}` }, (payload) => {
         if (!payload.new.is_active && activeQuiz?.id === payload.new.id) setActiveQuiz(null);
-      })
-      .subscribe();
+      }).subscribe();
+
+    // FIX 4: Listen for Teacher Ending the Session (Auto-Kick)
+    const sessionSub = supabase.channel('public:session_status')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'sessions', filter: `id=eq.${sessionId}` }, (payload) => {
+        if (payload.new.is_active === false) {
+          if (Platform.OS === 'web') {
+             alert("The teacher has ended this session.");
+          } else {
+             Alert.alert("Session Ended", "The teacher has ended this session.");
+          }
+          onLeave(); // Kicks them back to join screen instantly
+        }
+      }).subscribe();
 
     return () => {
       supabase.removeChannel(pulseSub);
       supabase.removeChannel(doubtSub);
       supabase.removeChannel(quizSub);
+      supabase.removeChannel(sessionSub);
     };
   }, [sessionId, activeQuiz]);
 
   const submitDoubt = async () => {
     if (doubtText.trim().length === 0 || !sessionId) return;
     
-    // Optimistic UI update
-    const tempId = Date.now().toString();
-    const newDoubt = { id: tempId, content: doubtText.trim(), is_answered: false, created_at: new Date().toISOString() };
-    setPendingDoubts(prev => [newDoubt, ...prev]);
-    setDoubtText('');
-
-    // Send to DB
-    await supabase.from('doubts').insert([{ session_id: sessionId, content: newDoubt.content }]);
+    const textToSend = doubtText.trim();
+    setDoubtText(''); // Instantly clear the text box so it feels fast
+    
+    // Send to DB. The INSERT listener above will catch it and put it on the screen!
+    await supabase.from('doubts').insert([{ session_id: sessionId, content: textToSend }]);
   };
 
   const getTimeAgo = (dateString) => {
@@ -140,7 +149,6 @@ export default function StudentAskDoubts({ sessionCode, onLeave, onPulseCheck, o
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
-          {/* ── DYNAMIC QUIZ BANNER ── */}
           {activeQuiz && (
             <TouchableOpacity onPress={() => onViewQuiz(activeQuiz)} activeOpacity={0.8} style={{ marginBottom: 20 }}>
               <NeumorphicView style={styles.quizBanner}>
